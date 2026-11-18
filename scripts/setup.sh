@@ -13,18 +13,12 @@ mkdir -p .cache
 curl -fsSL "$INSTALLER_URL" -o .cache/install-marivo.sh
 
 stage "Install and initialize Marivo"
-bash .cache/install-marivo.sh --yes
+bash .cache/install-marivo.sh --yes --extras duckdb
 
 stage "Install Yellow Taxi demo"
 .venv/bin/python -m pip install -e ".[dev]"
 
-stage "Download official NYC TLC data"
-.venv/bin/python -m yellow_taxi_demo.data download
-
-stage "Build DuckDB warehouse"
-.venv/bin/python -m yellow_taxi_demo.data build
-
-stage "Verify project"
+stage "Verify project against the remote NYC TLC files"
 "$MAKE_BIN" verify
 
 printf '\nYellow Taxi demo setup completed.\n'

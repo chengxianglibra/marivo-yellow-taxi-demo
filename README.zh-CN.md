@@ -2,9 +2,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-这是一个开箱即用的 Marivo 分析项目，数据源为 NYC TLC 官方发布的一整年
-Yellow Taxi 行程记录。克隆仓库并完成初始化后，即可在 coding agent 中直接
-使用 Marivo 语义层和分析接口。
+这是一个开箱即用的 Marivo 分析项目，使用 NYC TLC 官方发布的 2025 年 12 月
+Yellow Taxi 行程记录和单独发布的 Taxi Zone 对照表。克隆仓库并完成初始化后，
+即可在 coding agent 中使用 Marivo 语义层和分析接口。
 
 ## 初始化
 
@@ -18,26 +18,16 @@ cd marivo-yellow-taxi-demo
 make setup
 ```
 
-`make setup` 可以重复执行，并会完成全部初始化步骤：
-
-1. 安装 Marivo 并初始化 agent skills；
-2. 下载 2025 年 1 月至 12 月的 12 个官方月度 Parquet 文件，支持失败重试和
-   断点续传；
-3. 下载官方 TLC Taxi Zone 对照表；
-4. 构建 `data/warehouse.duckdb`；
-5. 获取有界的数据源 evidence，并预览每一个语义对象；
-6. 确认语义 catalog 完全 ready，且 doctor 没有 warning；
-7. 运行真实的 Marivo observation，覆盖 OD、数据质量、乘客、费用、时间模式、
-   速度和打赏分析路径。
-
-默认下载的数据约为 0.7–1 GB。再次执行 setup 时会复用已经完整下载的文件，
-仅在需要时重新构建。
+`make setup` 安装 Marivo 并初始化 agent skills，检查两个远程文件的表结构、
+验证语义层，并用源月份前七天执行实际观测。分析时，内存中的 DuckDB 通过 HTTPS
+直读源文件。首次远程查询可能安装 DuckDB 的 `httpfs` 扩展。
+安装器从上游解析 Marivo，重新执行 setup 可能替换本地选定的构建。
 
 ## 让 Agent 开始分析
 
 完成 setup 后，在 coding agent 中打开本仓库并提出问题，例如：
 
-> 比较 2025 年 12 月与 1 月的计价器车费收入。收入变化了多少？哪些上车行政区、
+> 比较 2025 年 12 月 1–7 日与 8–14 日的计价器车费收入。收入变化了多少？哪些上车行政区、
 > 上车区域、支付方式和费率类别对差异贡献最大？在得出结论前检查数据完整性和
 > 异常记录，区分计价器车费与乘客支付总额，并且不要作因果推断。
 
@@ -54,27 +44,25 @@ make analysis-smoke
 make data-verify
 ```
 
-仅在项目开发和 CI 场景中，可以选择有界的月份子集，而不改变仓库约定的一年
-数据范围：
-
-```bash
-TAXI_DEMO_MONTHS=2025-11,2025-12 make setup
-```
-
-普通使用者应执行不带月份覆盖参数的完整 setup。
+`make semantic-check` 预览代表性语义对象并检查两个区域关联。
+`make semantic-snapshot` 对所有已发布语义对象逐项执行有界预览。
 
 ## 数据模型
 
-DuckDB 通过下载的 Parquet 文件建立视图，每一行对应一条 2025 年官方发布的
-Yellow Taxi 行程记录。项目还提供两个具有明确角色的区域实体。trip 粒度上的
-上车和下车角色字段支持无关系歧义的组合 OD 分析：
+[`cloudfront` 数据源](models/datasources/cloudfront.py) 在同一个内存 DuckDB 引擎中
+读取两个独立配置的远程文件。[`yellow_trips`](models/semantic/mobility/trips.py)
+读取 2025 年 12 月 Parquet，[上车和下车区域实体](models/semantic/mobility/zones.py)
+读取各自角色的 Taxi Zone CSV。OD 分析可使用对应角色的行政区、Taxi Zone 和服务区维度。
+导出扁平表格时，可通过 `frame.to_pandas(axis_names=...)` 为同名轴指定不同列名。
 
 ```text
 yellow_trips
   ├── pickup_location_id  -> pickup_zones
-  ├── dropoff_location_id -> dropoff_zones
-  └── pickup_* + dropoff_* 角色字段，用于 OD 分析
+  └── dropoff_location_id -> dropoff_zones
 ```
+
+行程实体每行对应一条发布记录。该实体没有主键，因此依赖稳定行键的记录级操作
+不可用。
 
 受治理的核心指标覆盖：
 
@@ -97,14 +85,14 @@ yellow_trips
 - 行程距离在 0 至 200 英里之间；
 - 推算速度不超过 100 mph；
 - fare 和 total amount 非负；
-- 上车和下车区域均能解析到官方 Taxi Zone。
+- 上车和下车区域 ID 均位于官方已发布的 1–265 范围内。
 
 ## 数据来源与注意事项
 
 - 行程记录和数据字典：
   <https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page>
-- 官方发布文件：
-  <https://d37ci6vzurychx.cloudfront.net/trip-data/>
+- 2025 年 12 月行程文件：
+  <https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2025-12.parquet>
 - Taxi Zone：
   <https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv>
 

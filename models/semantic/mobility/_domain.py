@@ -7,7 +7,7 @@ ms.domain(
     ai_context=ms.ai_context(
         business_definition=(
             "NYC Yellow Taxi trip demand, passenger fares, route geography, and "
-            "published record quality for calendar year 2025."
+            "published record quality for the December 2025 source file."
         ),
         guardrails=[
             "Treat all timestamps as America/New_York local time.",

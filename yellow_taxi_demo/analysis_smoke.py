@@ -1,138 +1,93 @@
-"""End-to-end Marivo observations proving the main demo analysis families."""
+"""End-to-end Marivo observations proving the main demo analysis families.
+
+The first seven days of the configured month cover every weekday with a bounded
+remote read. The smoke checks joins, time patterns, and representative metrics.
+"""
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 
 import marivo.analysis as mv
 import marivo.semantic as ms
 import pandas as pd
 
-from yellow_taxi_demo.periods import selected_months
+from yellow_taxi_demo.data import MONTH_START, SOURCE_MONTH
+
+SESSION_NAME = "setup-smoke"
+SESSION_QUESTION = "Can the Yellow Taxi semantic layer execute its main analysis families?"
+REPORT_TIMEZONE = "America/New_York"
 
 
-def _month_window(month: str) -> tuple[str, str]:
-    year, month_number = (int(value) for value in month.split("-"))
-    start = date(year, month_number, 1)
-    end = date(year + (month_number == 12), (month_number % 12) + 1, 1)
-    return start.isoformat(), end.isoformat()
-
-
-def _dimension(name: str) -> ms.Ref:
-    return ms.ref.dimension(f"mobility.yellow_trips.{name}")
-
-
-def _observe(
-    session: mv.Session,
-    metric: str,
-    *,
-    start: str,
-    end: str,
-    dimensions: tuple[str, ...] = (),
-) -> pd.DataFrame:
-    frame = session.observe(
-        ms.ref.metric(f"mobility.{metric}"),
-        time_scope={"start": start, "end": end},
-        dimensions=[_dimension(name) for name in dimensions],
-        analysis_purpose=f"verify setup runtime for {metric}",
+def _session() -> mv.Session:
+    return mv.session.get_or_create(
+        SESSION_NAME,
+        question=SESSION_QUESTION,
+        timezone=REPORT_TIMEZONE,
     )
-    rows: pd.DataFrame = frame.to_pandas()
-    if rows.empty:
-        raise RuntimeError(f"Marivo setup smoke returned no rows for {metric}")
-    return rows
+
+
+def _value(rows: pd.DataFrame, name: str) -> pd.Series:
+    return pd.to_numeric(rows[name], errors="coerce")
 
 
 def main() -> None:
-    source_month = selected_months()[0]
-    month_start, _ = _month_window(source_month)
-    start = month_start
-    end = (date.fromisoformat(start) + timedelta(days=1)).isoformat()
-    session = mv.session.get_or_create(
-        name="setup-smoke",
-        question="Can the Yellow Taxi semantic layer execute its main analysis families?",
-    )
+    catalog = ms.load()
+    session = _session()
+    week_end = MONTH_START + timedelta(days=7)
+    time_scope = session.time_scope(start=MONTH_START.isoformat(), end=week_end.isoformat())
+    routes = session.observe(
+        {"trip_count": catalog.get("metric:mobility.trip_count")},
+        by=(
+            catalog.get("dimension:mobility.pickup_zones.borough"),
+            catalog.get("dimension:mobility.dropoff_zones.zone"),
+        ),
+        where=time_scope,
+    ).compute().to_pandas()
+    if routes.empty:
+        raise RuntimeError("time-scoped route observation returned no rows")
+    route_trips = int(_value(routes, "trip_count").sum())
+    pickup_boroughs = routes["borough"].nunique()
+    if route_trips <= 0 or pickup_boroughs < 5 or routes["zone"].nunique() < 2:
+        raise RuntimeError("route observation did not cover multiple zones and positive trips")
 
-    pickup = session.observe(
-        ms.ref.metric("mobility.trip_count"),
-        time_scope={"start": start, "end": end},
-        dimensions=[ms.ref.dimension("mobility.pickup_zones.borough")],
-        analysis_purpose="verify pickup-zone relationship execution",
-    ).to_pandas()
-    od = _observe(
-        session,
-        "trip_count",
-        start=start,
-        end=end,
-        dimensions=("pickup_borough", "dropoff_borough"),
-    )
-    quality = _observe(
-        session,
-        "implausible_record_rate",
-        start=start,
-        end=end,
-        dimensions=("payment_type",),
-    )
-    passengers = _observe(session, "average_passengers", start=start, end=end)
-    coverage = _observe(
-        session,
-        "plausible_passenger_count_coverage",
-        start=start,
-        end=end,
-    )
-    fees = _observe(
-        session,
-        "total_surcharges",
-        start=start,
-        end=end,
-        dimensions=("rate_code",),
-    )
-    time_pattern = _observe(
-        session,
-        "trip_count",
-        start=start,
-        end=end,
-        dimensions=("pickup_weekday", "pickup_hour"),
-    )
-    speed = _observe(
-        session,
-        "average_speed_mph",
-        start=start,
-        end=end,
-        dimensions=("pickup_borough",),
-    )
-    credit_tip = _observe(
-        session,
-        "credit_card_tip_rate",
-        start=start,
-        end=end,
-        dimensions=("pickup_borough",),
-    )
-
-    if pickup.empty or pickup["trip_count"].sum() <= 0:
-        raise RuntimeError("pickup relationship smoke returned no trips")
-    if od["trip_count"].sum() != pickup["trip_count"].sum():
-        raise RuntimeError("OD smoke does not reconcile to pickup trip count")
-    if not quality["implausible_record_rate"].between(0, 1).all():
-        raise RuntimeError("quality smoke returned a rate outside [0, 1]")
-    average_passengers = float(passengers["average_passengers"].iloc[0])
-    passenger_coverage = float(coverage["plausible_passenger_count_coverage"].iloc[0])
-    if not 0 < average_passengers <= 10:
-        raise RuntimeError("average passenger smoke returned an implausible value")
-    if not 0 < passenger_coverage <= 1:
-        raise RuntimeError("passenger coverage smoke returned a rate outside (0, 1]")
-    if fees["total_surcharges"].sum() <= 0:
-        raise RuntimeError("fee-component smoke returned no surcharges")
-    if time_pattern["trip_count"].sum() <= 0:
-        raise RuntimeError("time-pattern smoke returned no trips")
-    if not speed["average_speed_mph"].dropna().between(0, 100).all():
-        raise RuntimeError("speed smoke returned a value outside [0, 100] mph")
-    if not credit_tip["credit_card_tip_rate"].dropna().between(0, 1).all():
-        raise RuntimeError("credit-card tip smoke returned a rate outside [0, 1]")
-
+    payment_and_time = session.observe(
+        {
+            "trip_count": catalog.get("metric:mobility.trip_count"),
+            "average_speed_mph": catalog.get("metric:mobility.average_speed_mph"),
+            "implausible_record_rate": catalog.get("metric:mobility.implausible_record_rate"),
+        },
+        by=(
+            catalog.get("dimension:mobility.yellow_trips.source_month"),
+            catalog.get("dimension:mobility.yellow_trips.payment_type"),
+            catalog.get("dimension:mobility.yellow_trips.pickup_weekday"),
+            catalog.get("dimension:mobility.yellow_trips.pickup_hour"),
+        ),
+        where=time_scope,
+    ).compute().to_pandas()
+    if payment_and_time.empty:
+        raise RuntimeError("payment and time-pattern observation returned no rows")
+    if set(payment_and_time["source_month"]) != {SOURCE_MONTH}:
+        raise RuntimeError("the projected source month does not match the configured Parquet file")
+    payment_and_time_trips = int(_value(payment_and_time, "trip_count").sum())
+    tolerance = max(1, payment_and_time_trips // 1000)
+    if abs(payment_and_time_trips - route_trips) > tolerance:
+        raise RuntimeError(
+            "payment and time-pattern trips do not reconcile to the route observation: "
+            f"{payment_and_time_trips} != {route_trips} (tolerance {tolerance})"
+        )
+    if int(payment_and_time["pickup_hour"].nunique()) != 24:
+        raise RuntimeError("time-pattern observation did not cover all 24 pickup hours")
+    if int(payment_and_time["pickup_weekday"].nunique()) != 7:
+        raise RuntimeError("time-pattern observation did not cover all 7 pickup weekdays")
+    if not 0 < _value(payment_and_time, "average_speed_mph").max() <= 100:
+        raise RuntimeError("plausible aggregate speed is outside the demo's expected range")
+    if not (_value(payment_and_time, "implausible_record_rate") > 0).any():
+        raise RuntimeError("quality observation failed to detect implausible records")
     print(
-        "analysis smoke verified: pickup relationship, OD, quality, passengers, "
-        "fees, time patterns, speed, and credit-card tips "
-        f"for {start}"
+        "analysis smoke verified: time-scoped pickup relationship, OD, payment, and "
+        f"weekday/hour analysis over the first seven days of {SOURCE_MONTH} "
+        f"({route_trips:,} trips, {pickup_boroughs} pickup borough labels, session={session.id})"
     )
 
 

@@ -8,8 +8,7 @@ version = "0.1.0"
 description = "Agent-ready Marivo demo over NYC TLC Yellow Taxi data."
 requires-python = ">=3.12"
 dependencies = [
-  "duckdb>=1.4,<2",
-  "marivo[all]>=0.3.3",
+  "marivo[duckdb]>=0.6.9",
 ]
 
 [project.optional-dependencies]

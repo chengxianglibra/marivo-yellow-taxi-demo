@@ -1,4 +1,4 @@
-.PHONY: setup data-download data-build data-verify semantic-snapshot semantic-check analysis-smoke test lint typecheck verify clean-warehouse
+.PHONY: setup data-verify semantic-snapshot semantic-check analysis-smoke test lint typecheck verify
 
 VENV_PYTHON := .venv/bin/python
 TESTS ?= tests
@@ -6,19 +6,14 @@ TESTS ?= tests
 setup:
 	bash scripts/setup.sh
 
-data-download:
-	$(VENV_PYTHON) -m yellow_taxi_demo.data download
-
-data-build:
-	$(VENV_PYTHON) -m yellow_taxi_demo.data build
-
 data-verify:
-	$(VENV_PYTHON) -m yellow_taxi_demo.data verify
+	$(VENV_PYTHON) -m yellow_taxi_demo.data
 
 semantic-snapshot:
-	$(VENV_PYTHON) -m yellow_taxi_demo.semantic_snapshot
+	$(VENV_PYTHON) -m yellow_taxi_demo.semantic_snapshot --all
 
-semantic-check: semantic-snapshot
+semantic-check:
+	$(VENV_PYTHON) -m yellow_taxi_demo.semantic_snapshot
 	$(VENV_PYTHON) -m yellow_taxi_demo.semantic_check
 	.venv/bin/marivo doctor --semantic
 
@@ -35,6 +30,3 @@ typecheck:
 	$(VENV_PYTHON) -m mypy
 
 verify: data-verify semantic-check analysis-smoke test lint typecheck
-
-clean-warehouse:
-	rm -f data/warehouse.duckdb data/warehouse.duckdb.tmp

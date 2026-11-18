@@ -1,5 +1,6 @@
 # Marivo and local runtime state
 .marivo/
+/.dsh-data-analysis/
 .cache/
 .venv/
 .env
@@ -11,6 +12,7 @@
 .agents/
 .claude/
 .codex/
+/.dsh/skills/
 
 # Python caches and build artifacts
 __pycache__/
@@ -60,3 +62,6 @@ data/raw/
 data/warehouse.duckdb
 data/warehouse.duckdb.*
 data/download-manifest.json
+/analysis/june_revenue_dashboard/data.json
+/analysis/taxi_core_dashboard/data.json
+/analysis/taxi_core_dashboard/index.html

@@ -1,6 +1,6 @@
 # Where did recorded tip rate change?
 
-Compare the first and second halves of 2025. How did recorded credit-card tips
+Compare December 1–14 with December 15–28, 2025. How did recorded credit-card tips
 as a share of credit-card metered fares change? Compare that result with the
 share of trips paid by credit card and with recorded tips as a share of all
 metered fares.

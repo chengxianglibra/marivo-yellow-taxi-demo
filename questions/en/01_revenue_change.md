@@ -1,7 +1,7 @@
 # Why did fare revenue change?
 
-Compare December 2025 with January 2025 using appropriately aligned daily or
-weekly breakdowns. Quantify the change in metered fare revenue and determine
+Compare December 1–7 with December 8–14, 2025, using weekday-aligned daily
+breakdowns. Quantify the change in metered fare revenue and determine
 which pickup boroughs, pickup zones, payment methods, and rate categories
 accounted for most of the difference.
 

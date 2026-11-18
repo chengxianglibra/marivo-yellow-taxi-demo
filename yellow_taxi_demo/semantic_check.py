@@ -4,41 +4,41 @@ from __future__ import annotations
 
 import marivo.semantic as ms
 
+REQUIRED_METRICS = (
+    "mobility.trip_count",
+    "mobility.fare_revenue",
+    "mobility.total_surcharges",
+    "mobility.tip_rate",
+    "mobility.credit_card_tip_rate",
+    "mobility.average_passengers",
+    "mobility.passenger_count_coverage",
+    "mobility.plausible_passenger_count_coverage",
+    "mobility.average_speed_mph",
+    "mobility.implausible_record_rate",
+    "mobility.negative_fare_record_rate",
+)
+REQUIRED_DIMENSIONS = (
+    "mobility.pickup_zones.borough",
+    "mobility.dropoff_zones.borough",
+    "mobility.yellow_trips.pickup_location_id",
+    "mobility.yellow_trips.dropoff_location_id",
+    "mobility.yellow_trips.pickup_hour",
+    "mobility.yellow_trips.pickup_weekday",
+)
+
 
 def main() -> None:
     catalog = ms.load()
-    required = [
-        ms.ref.metric("mobility.trip_count"),
-        ms.ref.metric("mobility.fare_revenue"),
-        ms.ref.metric("mobility.total_surcharges"),
-        ms.ref.metric("mobility.tip_rate"),
-        ms.ref.metric("mobility.credit_card_tip_rate"),
-        ms.ref.metric("mobility.average_passengers"),
-        ms.ref.metric("mobility.passenger_count_coverage"),
-        ms.ref.metric("mobility.plausible_passenger_count_coverage"),
-        ms.ref.metric("mobility.average_speed_mph"),
-        ms.ref.metric("mobility.implausible_record_rate"),
-        ms.ref.metric("mobility.negative_fare_record_rate"),
-        ms.ref.dimension("mobility.pickup_zones.borough"),
-        ms.ref.dimension("mobility.dropoff_zones.borough"),
-        ms.ref.dimension("mobility.yellow_trips.pickup_borough"),
-        ms.ref.dimension("mobility.yellow_trips.dropoff_borough"),
-        ms.ref.dimension("mobility.yellow_trips.pickup_hour"),
-        ms.ref.dimension("mobility.yellow_trips.pickup_weekday"),
-    ]
-    for ref in required:
-        catalog.require(ref)
-    metrics = [ref for ref in required if ref.kind == "metric"]
-    report = catalog.readiness(refs=metrics)
+    required = [catalog.get(f"metric:{path}") for path in REQUIRED_METRICS]
+    required += [catalog.get(f"dimension:{path}") for path in REQUIRED_DIMENSIONS]
+    report = catalog.readiness(refs=required)
     if report.status != "ready":
         report.show()
-        raise RuntimeError(
-            "required Yellow Taxi metrics are not fully ready; "
-            "run make semantic-snapshot and inspect the report"
-        )
+        raise RuntimeError("required Yellow Taxi semantic definitions are not ready")
     print(
-        f"semantic catalog verified: {len(required)} required refs, "
-        f"readiness={report.status}"
+        f"semantic catalog verified: {len(REQUIRED_METRICS)} metrics + "
+        f"{len(REQUIRED_DIMENSIONS)} dimensions, "
+        f"physical dependency closures checked, readiness={report.status}"
     )
 
 

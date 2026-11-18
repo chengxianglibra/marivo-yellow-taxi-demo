@@ -1,14 +1,25 @@
 import marivo.datasource as md
 import marivo.semantic as ms
 
+# DuckDB resolves the remote CSV URL through a file replacement scan.
+ZONES_SOURCE = md.table(
+    "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv",
+    columns={
+        "location_id": "LocationID",
+        "borough": "Borough",
+        "zone": "Zone",
+        "service_zone": "service_zone",
+    },
+)
+
 ZONE_GUARDRAILS = [
     "Treat Unknown and N/A as published lookup categories, not inferred geography.",
 ]
 
 pickup_zones = ms.entity(
     name="pickup_zones",
-    datasource=ms.ref.datasource("warehouse"),
-    source=md.table("pickup_zones"),
+    datasource=ms.ref.datasource("cloudfront"),
+    source=ZONES_SOURCE,
     primary_key=["location_id"],
     ai_context=ms.ai_context(
         business_definition="One row per official TLC Taxi Zone in its pickup role.",
@@ -54,8 +65,8 @@ pickup_service_zone = ms.dimension_column(
 
 dropoff_zones = ms.entity(
     name="dropoff_zones",
-    datasource=ms.ref.datasource("warehouse"),
-    source=md.table("dropoff_zones"),
+    datasource=ms.ref.datasource("cloudfront"),
+    source=ZONES_SOURCE,
     primary_key=["location_id"],
     ai_context=ms.ai_context(
         business_definition="One row per official TLC Taxi Zone in its drop-off role.",

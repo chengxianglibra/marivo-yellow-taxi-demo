@@ -13,7 +13,7 @@ ms.relationship(
     ai_context=ms.ai_context(
         business_definition="Many published trips map to one official pickup Taxi Zone.",
         guardrails=[
-            "Use trip-owned pickup and drop-off role dimensions for combined OD analysis."
+            "For origins use the pickup role; for destinations use the drop-off role."
         ],
     ),
 )
@@ -31,7 +31,7 @@ ms.relationship(
     ai_context=ms.ai_context(
         business_definition="Many published trips map to one official drop-off Taxi Zone.",
         guardrails=[
-            "Use trip-owned pickup and drop-off role dimensions for combined OD analysis."
+            "For origins use the pickup role; for destinations use the drop-off role."
         ],
     ),
 )
