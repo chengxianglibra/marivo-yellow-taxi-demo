@@ -179,9 +179,10 @@ payment_type = ms.dimension_column(
     entity=yellow_trips,
     column="payment_type",
     ai_context=ms.ai_context(
-        business_definition="TLC payment category for the trip.",
+        business_definition="Published TLC payment category. Code 0 identifies Flex Fare.",
         guardrails=[
-            "Cash tips are generally not recorded; isolate credit-card trips for rider tip analysis."
+            "Cash tips are generally unrecorded. Isolate credit-card trips for rider tip analysis.",
+            "Compare fee_breakdown_coverage across payment categories before comparing charges.",
         ],
     ),
 )
@@ -566,3 +567,27 @@ passenger_count = ms.measure_column(
         guardrails=["Missing values are unknown and must not be interpreted as zero."],
     ),
 )
+
+
+@ms.dimension(
+    name="has_complete_fee_components",
+    entity=yellow_trips,
+    ai_context=ms.ai_context(
+        business_definition=(
+            "Whether the record reports all six published TLC fee components: extras, MTA tax, "
+            "improvement surcharge, congestion surcharge, airport fee, and CBD congestion fee."
+        ),
+        guardrails=[
+            "A reported zero counts as present. Any missing component makes the breakdown incomplete.",
+        ],
+    ),
+)
+def has_complete_fee_components(rows):
+    return (
+        ms.bind(extra_amount, rows).notnull()
+        & ms.bind(mta_tax_amount, rows).notnull()
+        & ms.bind(improvement_surcharge_amount, rows).notnull()
+        & ms.bind(congestion_surcharge_amount, rows).notnull()
+        & ms.bind(airport_fee_amount, rows).notnull()
+        & ms.bind(cbd_congestion_fee, rows).notnull()
+    )

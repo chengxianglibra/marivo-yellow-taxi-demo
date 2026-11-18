@@ -14,6 +14,8 @@ ms.domain(
             "Do not infer unique passengers or drivers; the public data has no stable identities.",
             "Do not describe before/after differences or correlations as causal effects.",
             "Credit-card tips are recorded automatically; cash tips are generally not recorded.",
+            "TLC payment code 0 identifies Flex Fare. Check fee reporting by payment type with "
+            "fee_breakdown_coverage.",
         ],
     ),
 )

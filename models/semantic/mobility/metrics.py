@@ -34,6 +34,7 @@ trip_duration_value = ms.ref.measure("mobility.yellow_trips.trip_duration")
 trip_duration_hours_value = ms.ref.measure("mobility.yellow_trips.trip_duration_hours")
 passenger_count_value = ms.ref.measure("mobility.yellow_trips.passenger_count")
 payment_type_value = ms.ref.dimension("mobility.yellow_trips.payment_type")
+payment_type_id_value = ms.ref.dimension("mobility.yellow_trips.payment_type_id")
 pickup_time_matches_source_month_value = ms.ref.dimension("mobility.yellow_trips.pickup_time_matches_source_month")
 has_positive_duration_value = ms.ref.dimension("mobility.yellow_trips.has_positive_duration")
 has_positive_distance_value = ms.ref.dimension("mobility.yellow_trips.has_positive_distance")
@@ -43,11 +44,16 @@ has_known_passenger_count_value = ms.ref.dimension("mobility.yellow_trips.has_kn
 has_valid_pickup_zone_value = ms.ref.dimension("mobility.yellow_trips.has_valid_pickup_zone")
 has_valid_dropoff_zone_value = ms.ref.dimension("mobility.yellow_trips.has_valid_dropoff_zone")
 is_plausible_record_value = ms.ref.dimension("mobility.yellow_trips.is_plausible_record")
+has_complete_fee_components_value = ms.ref.dimension(
+    "mobility.yellow_trips.has_complete_fee_components"
+)
 
 CREDIT_CARD = payment_type_value == "Credit card"
+FLEX_FARE = payment_type_id_value == 0
 PLAUSIBLE = is_plausible_record_value == True  # noqa: E712 - typed predicate comparison
 KNOWN_PASSENGERS = has_known_passenger_count_value == True  # noqa: E712
 PLAUSIBLE_KNOWN_PASSENGERS = PLAUSIBLE & KNOWN_PASSENGERS
+FEE_BREAKDOWN_COMPLETE = has_complete_fee_components_value == True  # noqa: E712
 
 
 @ms.metric(
@@ -123,7 +129,10 @@ def improvement_surcharges():
 @ms.metric(
     ai_context=ms.ai_context(
         business_definition="Sum of total passenger charges excluding unrecorded cash tips.",
-        guardrails=MONEY_GUARDRAILS,
+        guardrails=[
+            *MONEY_GUARDRAILS,
+            "Check fee_breakdown_coverage when reconciling the reported total to its components.",
+        ],
     ),
 )
 def total_charged():
@@ -166,7 +175,12 @@ def total_cbd_congestion_fees():
             "Sum of miscellaneous extras, MTA tax, improvement, congestion, airport, "
             "and CBD fee components."
         ),
-        guardrails=["Excludes metered fare, tips, and tolls."],
+        guardrails=[
+            "Excludes metered fare, tips, and tolls.",
+            "Each component is summed over its reported values. The result is missing when a "
+            "component has no reported values in the group.",
+            "Use fee_breakdown_coverage to check how many records report all six components.",
+        ],
     ),
 )
 def total_surcharges():
@@ -576,3 +590,52 @@ def nonpositive_distance_record_rate():
 )
 def negative_fare_record_rate():
     return negative_fare_count / trip_count
+
+
+@ms.metric(
+    ai_context=ms.ai_context(
+        business_definition="Count of published records with TLC payment code 0 (Flex Fare).",
+        guardrails=PUBLISHED_RECORD_GUARDRAILS,
+    ),
+)
+def flex_fare_trip_count():
+    return trips.count(time=picked_up_at_value).where(FLEX_FARE)
+
+
+@ms.metric(
+    ai_context=ms.ai_context(
+        business_definition="Share of published records with TLC payment code 0 (Flex Fare).",
+        guardrails=[
+            "The denominator is all published records in the observation scope.",
+        ],
+    ),
+)
+def flex_fare_trip_share():
+    return flex_fare_trip_count / trip_count
+
+
+@ms.metric(
+    ai_context=ms.ai_context(
+        business_definition="Count of published records that report all six TLC fee components.",
+        guardrails=["This count is the numerator of fee_breakdown_coverage."],
+    ),
+)
+def fee_breakdown_complete_trip_count():
+    return trips.count(time=picked_up_at_value).where(FEE_BREAKDOWN_COMPLETE)
+
+
+@ms.metric(
+    ai_context=ms.ai_context(
+        business_definition=(
+            "Share of published records that report all six TLC fee components "
+            "(extras, MTA tax, improvement, congestion, airport, and CBD)."
+        ),
+        guardrails=[
+            "The denominator is all published records in the observation scope.",
+            "A reported zero counts as present. Compare coverage by payment type before "
+            "interpreting total_surcharges.",
+        ],
+    ),
+)
+def fee_breakdown_coverage():
+    return fee_breakdown_complete_trip_count / trip_count

@@ -16,6 +16,8 @@ REQUIRED_METRICS = (
     "mobility.average_speed_mph",
     "mobility.implausible_record_rate",
     "mobility.negative_fare_record_rate",
+    "mobility.flex_fare_trip_share",
+    "mobility.fee_breakdown_coverage",
 )
 REQUIRED_DIMENSIONS = (
     "mobility.pickup_zones.borough",
@@ -24,6 +26,7 @@ REQUIRED_DIMENSIONS = (
     "mobility.yellow_trips.dropoff_location_id",
     "mobility.yellow_trips.pickup_hour",
     "mobility.yellow_trips.pickup_weekday",
+    "mobility.yellow_trips.has_complete_fee_components",
 )
 
 

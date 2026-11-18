@@ -77,6 +77,17 @@ congestion-pricing fees; and transparent record-quality counts and rates.
 Pickup hour, ISO weekday, weekend, zone, borough, and service-zone dimensions
 support operational and temporal pattern analysis.
 
+`flex_fare_trip_share` counts TLC payment code `0` as a share of published
+records in the observation scope. `fee_breakdown_coverage` divides the number
+of records with all six fee components present by the same published-record
+count. A reported zero counts as present. Both shares are missing when the
+observation scope has zero published records.
+
+In the December 1–7, 2025 check (New York local time), the 266,478 Flex Fare
+records had 0% fee breakdown coverage. The NYS congestion surcharge and
+airport fee were missing throughout the group. `tip_amount` was present on
+every record and nonzero on 24,703 records.
+
 Published totals retain correction-like records for auditability. Common
 averages and efficiency metrics use a documented plausible-record subset:
 source-month alignment, positive duration up to 24 hours, distance from 0 to
